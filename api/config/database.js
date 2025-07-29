@@ -58,8 +58,6 @@ async function initDatabase() {
     await createDbConnection.execute(`CREATE DATABASE IF NOT EXISTS ${dbConfig.database} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
     await createDbConnection.end();
     
-    console.log('数据库创建成功');
-    
     // 创建管理员表
     const createAdminTable = `
       CREATE TABLE IF NOT EXISTS admins (

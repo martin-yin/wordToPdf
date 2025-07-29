@@ -91,13 +91,11 @@ const pagination = reactive({
 const columns = [
   { title: '姓名', dataIndex: 'name', key: 'name', width: 100 },
   { title: '手机号', dataIndex: 'phone', key: 'phone', width: 120 },
-  { title: '省份', dataIndex: 'province', key: 'province', width: 80 },
-  { title: '城市', dataIndex: 'city', key: 'city', width: 80 },
-  { title: '区县', dataIndex: 'county', key: 'county', width: 80 },
+  { title: '地址', dataIndex: 'locationText', key: 'locationText', width: 200 },
   { title: '学习时长', dataIndex: 'learningTime', key: 'learningTime', width: 100 },
   { title: '教学方式', dataIndex: 'teachingMethod', key: 'teachingMethod', width: 100 },
   { title: '器材押金', dataIndex: 'instrumentDeposit', key: 'instrumentDeposit', width: 100 },
-  { title: '操作', key: 'action', width: 150, fixed: 'right' },
+  { title: '操作', key: 'action', width: 60, fixed: 'right' },
 ]
 
 onMounted(() => {
@@ -234,29 +232,25 @@ const getFullAddress = (provinceCode: string, cityCode: string, countyCode: stri
   return `${provinceName} ${cityName} ${countyName}`
 }
 
-const handleEdit = (record: any) => {
-  message.info('编辑功能开发中...')
-}
+// const handleDelete = async (record: any) => {
+//   try {
+//     const response = await fetch(`http://localhost:3000/api/student/${record.key}`, {
+//       method: 'DELETE',
+//     })
 
-const handleDelete = async (record: any) => {
-  try {
-    const response = await fetch(`http://localhost:3000/api/student/${record.key}`, {
-      method: 'DELETE',
-    })
+//     const result = await response.json()
 
-    const result = await response.json()
-
-    if (result.success) {
-      message.success('删除成功！')
-      loadTableData() // 重新加载数据
-    } else {
-      message.error(result.message || '删除失败')
-    }
-  } catch (error) {
-    console.error('删除学员失败:', error)
-    message.error('网络错误，请检查后端服务是否启动')
-  }
-}
+//     if (result.success) {
+//       message.success('删除成功！')
+//       loadTableData() // 重新加载数据
+//     } else {
+//       message.error(result.message || '删除失败')
+//     }
+//   } catch (error) {
+//     console.error('删除学员失败:', error)
+//     message.error('网络错误，请检查后端服务是否启动')
+//   }
+// }
 
 const loadTableData = async () => {
   try {
@@ -287,6 +281,7 @@ const loadTableData = async () => {
         learningTime: item.learning_time,
         teachingMethod: item.teaching_method,
         instrumentDeposit: item.instrument_deposit,
+        locationText: item.location_text,
         submitTime: new Date(item.created_at).toLocaleString('zh-CN'),
       }))
       pagination.total = result.data.total
@@ -297,6 +292,38 @@ const loadTableData = async () => {
     }
   } catch (error) {
     console.error('获取学员数据失败:', error)
+    message.error('网络错误，请检查后端服务是否启动')
+  }
+}
+
+const handlePrintPdf = async (record: StudentRecord) => {
+  try {
+    message.loading('正在生成PDF...', 0)
+
+    const response = await fetch(`http://localhost:3000/api/student/${record.key}/pdf`, {
+      method: 'GET',
+    })
+
+    if (response.ok) {
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${record.name}_学员信息.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      message.destroy()
+      message.success('PDF生成成功！')
+    } else {
+      message.destroy()
+      message.error('PDF生成失败')
+    }
+  } catch (error) {
+    console.error('生成PDF失败:', error)
+    message.destroy()
     message.error('网络错误，请检查后端服务是否启动')
   }
 }
@@ -346,7 +373,7 @@ const loadTableData = async () => {
     <div class="home-content">
       <div class="filter-section">
         <a-card title="" size="small">
-          <a-row :gutter="[16, 16]">
+          <a-row :gutter="[50, 16]">
             <a-col :span="6">
               <a-form-item label="手机号">
                 <a-input v-model:value="filters.phone" placeholder="请输入手机号" allow-clear />
@@ -365,7 +392,7 @@ const loadTableData = async () => {
                   allow-clear
                 >
                   <a-select-option value="线上教学">线上教学</a-select-option>
-                  <a-select-option value="线下教学">线下教学</a-select-option>
+                  <a-select-option value="线下课">线下课</a-select-option>
                 </a-select>
               </a-form-item>
             </a-col>
@@ -420,7 +447,6 @@ const loadTableData = async () => {
               <a-space>
                 <a-button @click="handleReset">重置</a-button>
                 <a-button type="primary" @click="handleSearch">搜索</a-button>
-                <a-button type="default" @click="handleExport">导出数据</a-button>
               </a-space>
             </a-col>
           </a-row>
@@ -452,16 +478,16 @@ const loadTableData = async () => {
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'action'">
                 <a-space>
-                  <a-button type="link" size="small" @click="handleView(record)">查看</a-button>
-                  <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-                  <a-popconfirm
+                  <a-button type="link" size="small" @click="handlePrintPdf(record)">打印</a-button>
+                  <!-- <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button> -->
+                  <!-- <a-popconfirm
                     title="确定要删除这条记录吗？"
                     @confirm="handleDelete(record)"
                     ok-text="确定"
                     cancel-text="取消"
                   >
                     <a-button type="link" size="small" danger>删除</a-button>
-                  </a-popconfirm>
+                  </a-popconfirm> -->
                 </a-space>
               </template>
             </template>

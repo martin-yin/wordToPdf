@@ -1,6 +1,158 @@
 const Koa = require('koa');
 const Router = require('koa-better-router');
 const { query, testConnection, initDatabase } = require('./config/database');
+const fs = require('fs');
+const path = require('path');
+const Docxtemplater = require('docxtemplater');
+const PizZip = require('pizzip');
+const { exec } = require('child_process');
+
+// 加载地址数据
+const pcaData = JSON.parse(fs.readFileSync(path.join(__dirname, 'pca-code.json'), 'utf8'));
+
+// 地址编码转换函数
+function getLocationName(code, type = 'all') {
+  if (!code) return '';
+  
+  // 查找省份
+  for (const province of pcaData) {
+    if (province.code === code) {
+      return province.name;
+    }
+    
+    // 查找城市
+    if (province.children) {
+      for (const city of province.children) {
+        if (city.code === code) {
+          return type === 'all' ? `${province.name} ${city.name}` : city.name;
+        }
+        
+        // 查找区县
+        if (city.children) {
+          for (const county of city.children) {
+            if (county.code === code) {
+              return type === 'all' ? `${province.name} ${city.name} ${county.name}` : county.name;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  return code; // 如果找不到，返回原编码
+}
+
+// 根据省市区编码获取完整地址
+function getFullAddress(provinceCode, cityCode, countyCode) {
+  const parts = [];
+  
+  if (provinceCode) {
+    const provinceName = getLocationName(provinceCode, 'single');
+    if (provinceName && provinceName !== provinceCode) {
+      parts.push(provinceName);
+    }
+  }
+  
+  if (cityCode) {
+    const cityName = getLocationName(cityCode, 'single');
+    if (cityName && cityName !== cityCode) {
+      parts.push(cityName);
+    }
+  }
+  
+  if (countyCode) {
+    const countyName = getLocationName(countyCode, 'single');
+    if (countyName && countyName !== countyCode) {
+      parts.push(countyName);
+    }
+  }
+  
+  return parts.join(' ');
+}
+
+// PDF生成函数
+function generatePDF(studentData) {
+  return new Promise((resolve, reject) => {
+    try {
+      // 读取模板文件
+      const templatePath = path.join(__dirname, 'template_word.docx');
+      const content = fs.readFileSync(templatePath, 'binary');
+
+      // 创建PizZip实例并加载文档
+      const zip = new PizZip(content);
+
+      // 创建docxtemplater实例
+      const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+      });
+
+      // 准备模板数据
+      const templateData = {
+        name: studentData.name || '',
+        age: studentData.age || '',
+        gender: studentData.gender || '',
+        phone: studentData.phone || '',
+        location_province: getLocationName(studentData.location_province, 'single') || '',
+        location_city: getLocationName(studentData.location_city, 'single') || '',
+        location_county: getLocationName(studentData.location_county, 'single') || '',
+        hobby: studentData.hobby || '',
+        current_level: studentData.current_level || '',
+        art_subject: studentData.art_subject || '',
+        learning_goal: studentData.learning_goal || '',
+        teaching_method: studentData.teaching_method === '一对一' ? '☑ 一对一 □ 一对多' : '□ 一对一 ☑ 一对多',
+        teaching_time: studentData.teaching_time === '线下课' ? '☑ 线下课 □ 线上课' : '□ 线下课 ☑ 线上课',
+        learning_time: studentData.learning_time ? `☑ ${studentData.learning_time}` : '',
+        instrument_deposit: studentData.instrument_deposit === '需要押金' ? '☑ 需要押金\n□ 无需押金' : '□ 需要押金\n☑ 无需押金',
+      };
+
+      // 渲染文档
+      doc.render(templateData);
+      
+      // 生成Word文档缓冲区
+      const buf = doc.getZip().generate({ type: 'nodebuffer' });
+      
+      // 创建临时文件
+      const timestamp = Date.now();
+      const tempDocxPath = path.join(__dirname, `temp_${timestamp}.docx`);
+      const tempPdfPath = path.join(__dirname, `temp_${timestamp}.pdf`);
+      
+      // 写入临时Word文件
+      fs.writeFileSync(tempDocxPath, buf);
+      
+      // 使用soffice命令转换为PDF
+      const command = `soffice --headless --convert-to pdf --outdir "${__dirname}" "${tempDocxPath}"`;
+      
+      exec(command, (error, stdout, stderr) => {
+        // 清理临时Word文件
+        if (fs.existsSync(tempDocxPath)) {
+          fs.unlinkSync(tempDocxPath);
+        }
+        
+        if (error) {
+          reject(new Error('PDF转换失败: ' + error.message));
+          return;
+        }
+        
+        // 检查PDF文件是否生成成功
+        if (fs.existsSync(tempPdfPath)) {
+          // 读取PDF文件
+          const pdfBuffer = fs.readFileSync(tempPdfPath);
+          
+          // 清理临时PDF文件
+          fs.unlinkSync(tempPdfPath);
+          
+          resolve(pdfBuffer);
+        } else {
+          reject(new Error('PDF文件生成失败'));
+        }
+      });
+      
+    } catch (error) {
+      reject(new Error('生成PDF时出错: ' + error.message));
+    }
+  });
+}
 
 const app = new Koa();
 const api = Router({ prefix: '/api' });
@@ -182,8 +334,8 @@ router.get('/students', async (ctx, next) => {
       params.push(`%${filters.name}%`);
     }
     if (filters.phone) {
-      sql += ' AND phone LIKE ?';
-      params.push(`%${filters.phone}%`);
+      sql += ' AND phone = ?';
+      params.push(filters.phone);
     }
     if (filters.province) {
       sql += ' AND location_province = ?';
@@ -222,10 +374,24 @@ router.get('/students', async (ctx, next) => {
     
     const students = await query(sql, params);
     
+    // 转换地址编码为地址名称
+    const studentsWithLocation = students.map(student => {
+      const locationText = getFullAddress(
+        student.location_province,
+        student.location_city,
+        student.location_county
+      );
+      
+      return {
+        ...student,
+        location_text: locationText || '未知地址'
+      };
+    });
+    
     ctx.body = {
       success: true,
       data: {
-        list: students,
+        list: studentsWithLocation,
         total,
         page: parseInt(page),
         pageSize: parseInt(pageSize)
@@ -240,22 +406,33 @@ router.get('/students', async (ctx, next) => {
   return next();
 });
 
-// 删除学员接口
-// router.delete('/student/:id', async (ctx, next) => {
-//   try {
-//     const { id } = ctx.params;
+// 生成PDF接口
+router.get('/student/:id/pdf', async (ctx, next) => {
+  try {
+    const { id } = ctx.params;
+    // 获取学员信息
+    const students = await query('SELECT * FROM students WHERE id = ?', [id]);
+    if (students.length === 0) {
+      ctx.status = 404;
+      ctx.body = { success: false, message: '学员不存在' };
+      return;
+    }
+    const student = students[0];
+    // 生成PDF
+    const pdfBuffer = await generatePDF(student);
+    // 设置响应头
+    ctx.set('Content-Type', 'application/pdf');
+    ctx.set('Content-Disposition', `attachment; filename="${encodeURIComponent(student.name || 'student')}_profile.pdf"`);
     
-//     await query('DELETE FROM students WHERE id = ?', [id]);
-    
-//     ctx.body = { success: true, message: '删除成功' };
-//   } catch (error) {
-//     console.error('删除学员错误:', error);
-//     ctx.status = 500;
-//     ctx.body = { success: false, message: '服务器内部错误' };
-//   }
+    ctx.body = pdfBuffer;
+  } catch (error) {
+    console.error('生成PDF错误:', error);
+    ctx.status = 500;
+    ctx.body = { success: false, message: '生成PDF失败: ' + error.message };
+  }
   
-//   return next();
-// });
+  return next();
+});
 
 // 以下接口需要鉴权
 

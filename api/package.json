@@ -9,8 +9,11 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "docxtemplater": "^3.65.2",
     "koa": "^3.0.1",
     "koa-better-router": "^2.1.1",
-    "mysql2": "^3.14.2"
+    "libreoffice-convert": "^1.6.1",
+    "mysql2": "^3.14.2",
+    "pizzip": "^3.2.0"
   }
 }

@@ -184,7 +184,7 @@
                 </a-button>
               </a-space>
             </template>
-            
+
             <a-table
               :columns="columns"
               :data-source="dataSource"
@@ -204,6 +204,10 @@
                     <a-button type="link" size="small" @click="handleEdit(record)">
                       <EditOutlined />
                       编辑
+                    </a-button>
+                    <a-button type="link" size="small" @click="handleGeneratePDF(record)">
+                      <DownloadOutlined />
+                      生成PDF
                     </a-button>
                     <a-popconfirm
                       title="确定要删除这条记录吗？"
@@ -423,7 +427,7 @@ onMounted(() => {
   if (storedUserInfo) {
     userInfo.value = JSON.parse(storedUserInfo)
   }
-  
+
   provinces.value = pcaData
 })
 
@@ -455,7 +459,7 @@ const getLocationText = (record: any) => {
   const province = provinces.value.find(p => p.code === record.location_province)
   const city = province?.children?.find((c: any) => c.code === record.location_city)
   const county = city?.children?.find((c: any) => c.code === record.location_county)
-  
+
   return `${province?.name || ''} ${city?.name || ''} ${county?.name || ''}`
 }
 
@@ -466,14 +470,14 @@ const handleSearch = async () => {
     const params = new URLSearchParams()
     params.append('page', '1')
     params.append('pageSize', pagination.pageSize.toString())
-    
+
     if (filters.name) params.append('name', filters.name)
     if (filters.phone) params.append('phone', filters.phone)
     if (filters.learning_time) params.append('learning_time', filters.learning_time)
     if (filters.teaching_method) params.append('teaching_method', filters.teaching_method)
     if (filters.instrument_deposit) params.append('instrument_deposit', filters.instrument_deposit)
     if (filters.teaching_time) params.append('teaching_time', filters.teaching_time)
-    
+
     // 构建地址筛选
     if (filters.province || filters.city || filters.county) {
       const provinceName = provinces.value.find(p => p.code === filters.province)?.name || ''
@@ -516,7 +520,7 @@ const handleReset = () => {
   filters.teaching_method = undefined
   filters.instrument_deposit = undefined
   filters.teaching_time = undefined
-  
+
   cities.value = []
   counties.value = []
   message.info('筛选条件已重置')
@@ -566,6 +570,38 @@ const handleDelete = async (record: any) => {
     }
   } catch (error) {
     console.error('删除学员失败:', error)
+    message.error('网络错误，请检查后端服务是否启动')
+  }
+}
+
+// 生成PDF
+const handleGeneratePDF = async (record: any) => {
+  try {
+    message.loading('正在生成PDF，请稍候...', 0)
+
+    const response = await fetch(`http://localhost:3000/api/student/${record.key}/pdf`)
+
+    if (response.ok) {
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${record.name || 'student'}_profile.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      message.destroy()
+      message.success(`${record.name} 的PDF已生成并下载`)
+    } else {
+      const result = await response.json()
+      message.destroy()
+      message.error(result.message || 'PDF生成失败')
+    }
+  } catch (error) {
+    console.error('生成PDF失败:', error)
+    message.destroy()
     message.error('网络错误，请检查后端服务是否启动')
   }
 }
@@ -663,11 +699,11 @@ const handleDelete = async (record: any) => {
   .data-management-container {
     padding: 10px;
   }
-  
+
   .management-card {
     padding: 20px;
   }
-  
+
   .filter-form .ant-col {
     width: 100% !important;
   }
