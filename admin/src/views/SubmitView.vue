@@ -13,7 +13,7 @@
         退出登录
       </a-button>
     </div>
-    
+
     <div class="submit-wrapper">
       <div class="submit-card">
         <div class="submit-header">
@@ -414,7 +414,7 @@ onMounted(() => {
   if (storedUserInfo) {
     userInfo.value = JSON.parse(storedUserInfo)
   }
-  
+
   // 初始化地址数据
   provinces.value = pcaData
   updateCities()
@@ -553,17 +553,36 @@ const rules = {
 const onFinish = async (values: FormState) => {
   loading.value = true
   try {
-    // 模拟提交请求
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    // 获取地址名称
+    const provinceName = provinces.value.find(p => p.code === values.location_province)?.name || ''
+    const cityName = cities.value.find(c => c.code === values.location_city)?.name || ''
+    const countyName = counties.value.find(c => c.code === values.location_county)?.name || ''
 
-    console.log('提交的表单数据:', values)
+    const submitData = {
+      ...values,
+      location: `${provinceName}${cityName}${countyName}`,
+      submitter: userInfo.value?.username || 'unknown'
+    }
 
-    message.success('学员信息提交成功！')
+    const response = await fetch('http://localhost:3000/api/student', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(submitData),
+    })
 
-    // 提交成功后可以重置表单或跳转页面
-    // resetForm()
+    const result = await response.json()
+
+    if (result.success) {
+      message.success('学员信息提交成功！')
+      resetForm(false)
+    } else {
+      message.error(result.message || '提交失败')
+    }
   } catch (error) {
-    message.error('提交失败，请重试！')
+    console.error('提交学员信息失败:', error)
+    message.error('网络错误，请检查后端服务是否启动')
   } finally {
     loading.value = false
   }
@@ -574,7 +593,7 @@ const onFinishFailed = (errorInfo: any) => {
   message.error('请检查表单信息并完善必填项！')
 }
 
-const resetForm = () => {
+const resetForm = (notice: boolean = true) => {
   Object.assign(formState, {
     name: '',
     age: null,
@@ -595,7 +614,7 @@ const resetForm = () => {
   updateCities()
   updateCounties()
   phoneStatus.value = ''
-  message.info('表单已重置')
+  notice && message.info('表单已重置')
 }
 </script>
 

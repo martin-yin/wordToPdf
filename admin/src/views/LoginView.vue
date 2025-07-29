@@ -100,23 +100,38 @@ const onFinish = async (values: FormState) => {
   loading.value = true
 
   try {
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    console.log('登录信息:', values)
+    const response = await fetch('http://localhost:3000/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: values.username,
+        password: values.password,
+      }),
+    })
 
-    // 模拟登录验证
-    if (values.username === 'admin' && values.password === '123456') {
-      message.success('管理员登录成功！')
-      localStorage.setItem('userInfo', JSON.stringify({ username: 'admin', role: 'admin' }))
-      router.push('/')
-    } else if (values.username === 'zhangsan' && values.password === '123456') {
-      message.success('用户登录成功！')
-      localStorage.setItem('userInfo', JSON.stringify({ username: 'zhangsan', role: 'user' }))
-      router.push('/submit')
+    const result = await response.json()
+
+    if (result.success) {
+      message.success('登录成功！')
+      localStorage.setItem('userInfo', JSON.stringify({
+        username: result.data.username,
+        role: result.data.role
+      }))
+      
+      // 根据角色跳转到不同页面
+      if (result.data.role === 'admin') {
+        router.push('/')
+      } else {
+        router.push('/submit')
+      }
     } else {
-      message.error('用户名或密码错误！')
+      message.error(result.message || '登录失败')
     }
   } catch (error) {
-    message.error('登录失败，请检查用户名和密码！')
+    console.error('登录失败:', error)
+    message.error('网络错误，请检查后端服务是否启动')
   } finally {
     loading.value = false
   }

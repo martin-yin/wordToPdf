@@ -460,13 +460,49 @@ const getLocationText = (record: any) => {
 }
 
 // 搜索
-const handleSearch = () => {
+const handleSearch = async () => {
   loading.value = true
-  setTimeout(() => {
-    // 这里应该调用API进行搜索
-    message.success('搜索完成')
+  try {
+    const params = new URLSearchParams()
+    params.append('page', '1')
+    params.append('pageSize', pagination.pageSize.toString())
+    
+    if (filters.name) params.append('name', filters.name)
+    if (filters.phone) params.append('phone', filters.phone)
+    if (filters.learning_time) params.append('learning_time', filters.learning_time)
+    if (filters.teaching_method) params.append('teaching_method', filters.teaching_method)
+    if (filters.instrument_deposit) params.append('instrument_deposit', filters.instrument_deposit)
+    if (filters.teaching_time) params.append('teaching_time', filters.teaching_time)
+    
+    // 构建地址筛选
+    if (filters.province || filters.city || filters.county) {
+      const provinceName = provinces.value.find(p => p.code === filters.province)?.name || ''
+      const cityName = cities.value.find(c => c.code === filters.city)?.name || ''
+      const countyName = counties.value.find(c => c.code === filters.county)?.name || ''
+      const location = `${provinceName}${cityName}${countyName}`.trim()
+      if (location) params.append('location', location)
+    }
+
+    const response = await fetch(`http://localhost:3000/api/students?${params}`)
+    const result = await response.json()
+
+    if (result.success) {
+      dataSource.value = result.data.map((item: any, index: number) => ({
+        ...item,
+        key: item.id || index
+      }))
+      pagination.total = result.total
+      pagination.current = 1
+      message.success('搜索完成')
+    } else {
+      message.error(result.message || '搜索失败')
+    }
+  } catch (error) {
+    console.error('搜索失败:', error)
+    message.error('网络错误，请检查后端服务是否启动')
+  } finally {
     loading.value = false
-  }, 1000)
+  }
 }
 
 // 重置
@@ -513,8 +549,25 @@ const handleEdit = (record: any) => {
 }
 
 // 删除
-const handleDelete = (record: any) => {
-  message.success(`已删除 ${record.name} 的记录`)
+const handleDelete = async (record: any) => {
+  try {
+    const response = await fetch(`http://localhost:3000/api/student/${record.key}`, {
+      method: 'DELETE',
+    })
+
+    const result = await response.json()
+
+    if (result.success) {
+      message.success(`已删除 ${record.name} 的记录`)
+      // 重新搜索数据
+      handleSearch()
+    } else {
+      message.error(result.message || '删除失败')
+    }
+  } catch (error) {
+    console.error('删除学员失败:', error)
+    message.error('网络错误，请检查后端服务是否启动')
+  }
 }
 </script>
 

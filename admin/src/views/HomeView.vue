@@ -2,8 +2,22 @@
 import { ref, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { LogoutOutlined, UserOutlined, LockOutlined, FileTextOutlined, SettingOutlined, DownOutlined, ReloadOutlined } from '@ant-design/icons-vue'
-import { provinces, getCitiesByProvince, getCountiesByCity, getNameByCode, type Region } from '@/utils/regions'
+import {
+  LogoutOutlined,
+  UserOutlined,
+  LockOutlined,
+  FileTextOutlined,
+  SettingOutlined,
+  DownOutlined,
+  ReloadOutlined,
+} from '@ant-design/icons-vue'
+import {
+  provinces,
+  getCitiesByProvince,
+  getCountiesByCity,
+  getNameByCode,
+  type Region,
+} from '@/utils/regions'
 
 const router = useRouter()
 const userInfo = ref<any>(null)
@@ -43,7 +57,7 @@ const filters = reactive<FilterType>({
   name: '',
   learningTime: undefined,
   teachingMethod: undefined,
-  instrumentDeposit: undefined
+  instrumentDeposit: undefined,
 })
 
 // 地区数据
@@ -59,7 +73,7 @@ const passwordModalVisible = ref(false)
 const passwordForm = reactive({
   oldPassword: '',
   newPassword: '',
-  confirmPassword: ''
+  confirmPassword: '',
 })
 
 // 表格数据
@@ -70,7 +84,7 @@ const pagination = reactive({
   total: 0,
   showSizeChanger: true,
   showQuickJumper: true,
-  showTotal: (total: number) => `共 ${total} 条记录`
+  showTotal: (total: number) => `共 ${total} 条记录`,
 })
 
 // 表格列定义
@@ -83,8 +97,7 @@ const columns = [
   { title: '学习时长', dataIndex: 'learningTime', key: 'learningTime', width: 100 },
   { title: '教学方式', dataIndex: 'teachingMethod', key: 'teachingMethod', width: 100 },
   { title: '器材押金', dataIndex: 'instrumentDeposit', key: 'instrumentDeposit', width: 100 },
-  { title: '提交时间', dataIndex: 'submitTime', key: 'submitTime', width: 150 },
-  { title: '操作', key: 'action', width: 150, fixed: 'right' }
+  { title: '操作', key: 'action', width: 150, fixed: 'right' },
 ]
 
 onMounted(() => {
@@ -118,7 +131,7 @@ const handlePasswordModalClose = () => {
 }
 
 // 确认修改密码
-const handlePasswordSubmit = () => {
+const handlePasswordSubmit = async () => {
   if (!passwordForm.oldPassword) {
     message.error('请输入原密码')
     return
@@ -135,13 +148,32 @@ const handlePasswordSubmit = () => {
     message.error('两次输入的密码不一致')
     return
   }
-  
-  // 这里应该调用API修改密码
-  message.loading('正在修改密码...', 1)
-  setTimeout(() => {
-    message.success('密码修改成功！')
-    handlePasswordModalClose()
-  }, 1000)
+
+  try {
+    const response = await fetch('http://localhost:3000/api/password', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: userInfo.value?.username,
+        oldPassword: passwordForm.oldPassword,
+        newPassword: passwordForm.newPassword,
+      }),
+    })
+
+    const result = await response.json()
+
+    if (result.success) {
+      message.success('密码修改成功！')
+      handlePasswordModalClose()
+    } else {
+      message.error(result.message || '密码修改失败')
+    }
+  } catch (error) {
+    console.error('修改密码失败:', error)
+    message.error('网络错误，请检查后端服务是否启动')
+  }
 }
 
 const onProvinceChange = (value: string) => {
@@ -206,54 +238,67 @@ const handleEdit = (record: any) => {
   message.info('编辑功能开发中...')
 }
 
-const handleDelete = (record: any) => {
-  message.info('删除功能开发中...')
+const handleDelete = async (record: any) => {
+  try {
+    const response = await fetch(`http://localhost:3000/api/student/${record.key}`, {
+      method: 'DELETE',
+    })
+
+    const result = await response.json()
+
+    if (result.success) {
+      message.success('删除成功！')
+      loadTableData() // 重新加载数据
+    } else {
+      message.error(result.message || '删除失败')
+    }
+  } catch (error) {
+    console.error('删除学员失败:', error)
+    message.error('网络错误，请检查后端服务是否启动')
+  }
 }
 
-const loadTableData = () => {
-  // 模拟数据加载
-  message.loading('加载数据中...', 1)
-  setTimeout(() => {
-    tableData.value = [
-      {
-        key: '1',
-        name: '张三',
-        phone: '13800138001',
-        province: '11',
-        city: '1101',
-        county: '110105',
-        learningTime: '3个月',
-        teachingMethod: '线上教学',
-        instrumentDeposit: '1000元',
-        submitTime: '2024-01-15 10:30:00'
-      },
-      {
-        key: '2',
-        name: '李四',
-        phone: '13800138002',
-        province: '31',
-        city: '3101',
-        county: '310115',
-        learningTime: '6个月',
-        teachingMethod: '线下教学',
-        instrumentDeposit: '1500元',
-        submitTime: '2024-01-16 14:20:00'
-      },
-      {
-        key: '3',
-        name: '王五',
-        phone: '13800138003',
-        province: '44',
-        city: '4401',
-        county: '440106',
-        learningTime: '1年',
-        teachingMethod: '混合教学',
-        instrumentDeposit: '2000元',
-        submitTime: '2024-01-17 09:15:00'
-      }
-    ]
-    pagination.total = 3
-  }, 1000)
+const loadTableData = async () => {
+  try {
+    const params = new URLSearchParams({
+      page: pagination.current.toString(),
+      pageSize: pagination.pageSize.toString(),
+      ...(filters.name && { name: filters.name }),
+      ...(filters.phone && { phone: filters.phone }),
+      ...(filters.province && { province: filters.province }),
+      ...(filters.city && { city: filters.city }),
+      ...(filters.county && { county: filters.county }),
+      ...(filters.learningTime && { learningTime: filters.learningTime }),
+      ...(filters.teachingMethod && { teachingMethod: filters.teachingMethod }),
+      ...(filters.instrumentDeposit && { instrumentDeposit: filters.instrumentDeposit }),
+    })
+
+    const response = await fetch(`http://localhost:3000/api/students?${params}`)
+    const result = await response.json()
+
+    if (result.success) {
+      tableData.value = result.data.list.map((item: any) => ({
+        key: item.id.toString(),
+        name: item.name,
+        phone: item.phone,
+        province: item.location_province,
+        city: item.location_city,
+        county: item.location_county,
+        learningTime: item.learning_time,
+        teachingMethod: item.teaching_method,
+        instrumentDeposit: item.instrument_deposit,
+        submitTime: new Date(item.created_at).toLocaleString('zh-CN'),
+      }))
+      pagination.total = result.data.total
+      pagination.current = result.data.page
+      pagination.pageSize = result.data.pageSize
+    } else {
+      message.error(result.message || '获取数据失败')
+    }
+  } catch (error) {
+    console.error('获取学员数据失败:', error)
+    message.error('网络错误，请检查后端服务是否启动')
+  }
 }
 </script>
 
@@ -262,7 +307,11 @@ const loadTableData = () => {
     <!-- 用户信息头部 -->
     <div class="user-header">
       <div class="user-info">
-        <span>欢迎，{{ userInfo?.username }} ({{ userInfo?.role === 'admin' ? '管理员' : '用户' }})</span>
+        <span
+          >欢迎，{{ userInfo?.username }} ({{
+            userInfo?.role === 'admin' ? '管理员' : '用户'
+          }})</span
+        >
       </div>
       <div class="header-actions">
         <a-dropdown>
@@ -284,7 +333,7 @@ const loadTableData = () => {
             <DownOutlined />
           </a-button>
         </a-dropdown>
-        <a-button type="primary" danger @click="handleLogout" style="margin-left: 12px;">
+        <a-button type="primary" danger @click="handleLogout" style="margin-left: 12px">
           <template #icon>
             <LogoutOutlined />
           </template>
@@ -296,35 +345,8 @@ const loadTableData = () => {
     <!-- 主要内容 -->
     <div class="home-content">
       <div class="filter-section">
-        <a-card title="筛选条件" size="small">
+        <a-card title="" size="small">
           <a-row :gutter="[16, 16]">
-            <a-col :span="6">
-              <a-form-item label="省份">
-                <a-select v-model:value="filters.province" placeholder="请选择省份" allow-clear @change="onProvinceChange">
-                  <a-select-option v-for="province in provinces" :key="province.code" :value="province.code">
-                    {{ province.name }}
-                  </a-select-option>
-                </a-select>
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item label="城市">
-                <a-select v-model:value="filters.city" placeholder="请选择城市" allow-clear @change="onCityChange">
-                  <a-select-option v-for="city in cities" :key="city.code" :value="city.code">
-                    {{ city.name }}
-                  </a-select-option>
-                </a-select>
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item label="区县">
-                <a-select v-model:value="filters.county" placeholder="请选择区县" allow-clear>
-                  <a-select-option v-for="county in counties" :key="county.code" :value="county.code">
-                    {{ county.name }}
-                  </a-select-option>
-                </a-select>
-              </a-form-item>
-            </a-col>
             <a-col :span="6">
               <a-form-item label="手机号">
                 <a-input v-model:value="filters.phone" placeholder="请输入手机号" allow-clear />
@@ -336,16 +358,65 @@ const loadTableData = () => {
               </a-form-item>
             </a-col>
             <a-col :span="6">
-               <a-form-item label="教学方式">
-                <a-select v-model:value="filters.teachingMethod" placeholder="请选择教学方式" allow-clear>
+              <a-form-item label="教学方式">
+                <a-select
+                  v-model:value="filters.teachingMethod"
+                  placeholder="请选择教学方式"
+                  allow-clear
+                >
                   <a-select-option value="线上教学">线上教学</a-select-option>
                   <a-select-option value="线下教学">线下教学</a-select-option>
                 </a-select>
               </a-form-item>
             </a-col>
+            <a-col :span="6">
+              <a-form-item label="省份">
+                <a-select
+                  v-model:value="filters.province"
+                  placeholder="请选择省份"
+                  allow-clear
+                  @change="onProvinceChange"
+                >
+                  <a-select-option
+                    v-for="province in provinces"
+                    :key="province.code"
+                    :value="province.code"
+                  >
+                    {{ province.name }}
+                  </a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="6">
+              <a-form-item label="城市">
+                <a-select
+                  v-model:value="filters.city"
+                  placeholder="请选择城市"
+                  allow-clear
+                  @change="onCityChange"
+                >
+                  <a-select-option v-for="city in cities" :key="city.code" :value="city.code">
+                    {{ city.name }}
+                  </a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="6">
+              <a-form-item label="区县">
+                <a-select v-model:value="filters.county" placeholder="请选择区县" allow-clear>
+                  <a-select-option
+                    v-for="county in counties"
+                    :key="county.code"
+                    :value="county.code"
+                  >
+                    {{ county.name }}
+                  </a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
           </a-row>
           <a-row>
-            <a-col :span="24" style="text-align: right;">
+            <a-col :span="24" style="text-align: right">
               <a-space>
                 <a-button @click="handleReset">重置</a-button>
                 <a-button type="primary" @click="handleSearch">搜索</a-button>
@@ -360,7 +431,7 @@ const loadTableData = () => {
       <div class="table-section">
         <a-card>
           <template #title>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; justify-content: space-between; align-items: center">
               <span>学员资料列表</span>
               <a-button type="primary" size="small" @click="handleRefresh">
                 <template #icon>
@@ -383,7 +454,14 @@ const loadTableData = () => {
                 <a-space>
                   <a-button type="link" size="small" @click="handleView(record)">查看</a-button>
                   <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-                  <a-button type="link" size="small" danger @click="handleDelete(record)">删除</a-button>
+                  <a-popconfirm
+                    title="确定要删除这条记录吗？"
+                    @confirm="handleDelete(record)"
+                    ok-text="确定"
+                    cancel-text="取消"
+                  >
+                    <a-button type="link" size="small" danger>删除</a-button>
+                  </a-popconfirm>
                 </a-space>
               </template>
             </template>
@@ -391,72 +469,75 @@ const loadTableData = () => {
         </a-card>
       </div>
     </div>
-
     <!-- 查看详情模态框 -->
-     <a-modal
-       v-model:open="viewModalVisible"
-       title="学员详细信息"
-       width="600px"
-       :footer="null"
-       @cancel="handleViewModalClose"
-     >
-       <div v-if="viewRecord" class="view-modal-content">
-         <a-descriptions :column="2" bordered>
-           <a-descriptions-item label="姓名">{{ viewRecord.name }}</a-descriptions-item>
-           <a-descriptions-item label="手机号">{{ viewRecord.phone }}</a-descriptions-item>
-           <a-descriptions-item label="完整地址" :span="2">
-             {{ getFullAddress(viewRecord.province, viewRecord.city, viewRecord.county) }}
-           </a-descriptions-item>
-           <a-descriptions-item label="学习时长">{{ viewRecord.learningTime }}</a-descriptions-item>
-           <a-descriptions-item label="教学方式">{{ viewRecord.teachingMethod }}</a-descriptions-item>
-           <a-descriptions-item label="器材押金">{{ viewRecord.instrumentDeposit }}</a-descriptions-item>
-           <a-descriptions-item label="提交时间">{{ viewRecord.submitTime }}</a-descriptions-item>
-         </a-descriptions>
-       </div>
-       <template #footer>
-         <a-button @click="handleViewModalClose">关闭</a-button>
-       </template>
-     </a-modal>
+    <a-modal
+      v-model:open="viewModalVisible"
+      title="学员详细信息"
+      width="600px"
+      :footer="null"
+      @cancel="handleViewModalClose"
+    >
+      <div v-if="viewRecord" class="view-modal-content">
+        <a-descriptions :column="2" bordered>
+          <a-descriptions-item label="姓名">{{ viewRecord.name }}</a-descriptions-item>
+          <a-descriptions-item label="手机号">{{ viewRecord.phone }}</a-descriptions-item>
+          <a-descriptions-item label="完整地址" :span="2">
+            {{ getFullAddress(viewRecord.province, viewRecord.city, viewRecord.county) }}
+          </a-descriptions-item>
+          <a-descriptions-item label="学习时长">{{ viewRecord.learningTime }}</a-descriptions-item>
+          <a-descriptions-item label="教学方式">{{
+            viewRecord.teachingMethod
+          }}</a-descriptions-item>
+          <a-descriptions-item label="器材押金">{{
+            viewRecord.instrumentDeposit
+          }}</a-descriptions-item>
+          <a-descriptions-item label="提交时间">{{ viewRecord.submitTime }}</a-descriptions-item>
+        </a-descriptions>
+      </div>
+      <template #footer>
+        <a-button @click="handleViewModalClose">关闭</a-button>
+      </template>
+    </a-modal>
 
-     <!-- 密码修改模态框 -->
-     <a-modal
-       v-model:open="passwordModalVisible"
-       title="管理员密码修改"
-       width="400px"
-       @cancel="handlePasswordModalClose"
-     >
-       <div class="password-modal-content">
-         <a-form layout="vertical">
-           <a-form-item label="原密码" required>
-             <a-input-password
-               v-model:value="passwordForm.oldPassword"
-               placeholder="请输入原密码"
-               size="large"
-             />
-           </a-form-item>
-           <a-form-item label="新密码" required>
-             <a-input-password
-               v-model:value="passwordForm.newPassword"
-               placeholder="请输入新密码（至少6位）"
-               size="large"
-             />
-           </a-form-item>
-           <a-form-item label="确认新密码" required>
-             <a-input-password
-               v-model:value="passwordForm.confirmPassword"
-               placeholder="请再次输入新密码"
-               size="large"
-             />
-           </a-form-item>
-         </a-form>
-       </div>
-       <template #footer>
-         <a-space>
-           <a-button @click="handlePasswordModalClose">取消</a-button>
-           <a-button type="primary" @click="handlePasswordSubmit">确认修改</a-button>
-         </a-space>
-       </template>
-     </a-modal>
+    <!-- 密码修改模态框 -->
+    <a-modal
+      v-model:open="passwordModalVisible"
+      title="管理员密码修改"
+      width="400px"
+      @cancel="handlePasswordModalClose"
+    >
+      <div class="password-modal-content">
+        <a-form layout="vertical">
+          <a-form-item label="原密码" required>
+            <a-input-password
+              v-model:value="passwordForm.oldPassword"
+              placeholder="请输入原密码"
+              size="large"
+            />
+          </a-form-item>
+          <a-form-item label="新密码" required>
+            <a-input-password
+              v-model:value="passwordForm.newPassword"
+              placeholder="请输入新密码（至少6位）"
+              size="large"
+            />
+          </a-form-item>
+          <a-form-item label="确认新密码" required>
+            <a-input-password
+              v-model:value="passwordForm.confirmPassword"
+              placeholder="请再次输入新密码"
+              size="large"
+            />
+          </a-form-item>
+        </a-form>
+      </div>
+      <template #footer>
+        <a-space>
+          <a-button @click="handlePasswordModalClose">取消</a-button>
+          <a-button type="primary" @click="handlePasswordSubmit">确认修改</a-button>
+        </a-space>
+      </template>
+    </a-modal>
   </div>
 </template>
 
