@@ -232,26 +232,6 @@ const getFullAddress = (provinceCode: string, cityCode: string, countyCode: stri
   return `${provinceName} ${cityName} ${countyName}`
 }
 
-// const handleDelete = async (record: any) => {
-//   try {
-//     const response = await fetch(`http://localhost:3000/api/student/${record.key}`, {
-//       method: 'DELETE',
-//     })
-
-//     const result = await response.json()
-
-//     if (result.success) {
-//       message.success('删除成功！')
-//       loadTableData() // 重新加载数据
-//     } else {
-//       message.error(result.message || '删除失败')
-//     }
-//   } catch (error) {
-//     console.error('删除学员失败:', error)
-//     message.error('网络错误，请检查后端服务是否启动')
-//   }
-// }
-
 const loadTableData = async () => {
   try {
     const params = new URLSearchParams({

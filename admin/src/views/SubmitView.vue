@@ -310,6 +310,121 @@
             </a-col>
           </a-row>
 
+          <!-- 支付信息 -->
+          <a-divider orientation="left">支付信息</a-divider>
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item
+                label="支付方式"
+                name="pay_method"
+                class="form-item"
+              >
+                <a-select
+                  v-model:value="formState.pay_method"
+                  placeholder="请选择支付方式"
+                  size="large"
+                  class="input-field"
+                >
+                  <a-select-option value="微信">微信</a-select-option>
+                  <a-select-option value="银行转账">银行转账</a-select-option>
+                  <a-select-option value="支付宝">支付宝</a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+
+            <a-col :span="12">
+              <a-form-item
+                label="金额"
+                name="amount"
+                class="form-item"
+              >
+                <a-input-number
+                  v-model:value="formState.amount"
+                  placeholder="请输入金额"
+                  size="large"
+                  class="input-field"
+                  :min="0"
+                  :precision="2"
+                  style="width: 100%"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <!-- 公益相关信息 -->
+          <a-divider orientation="left">公益相关信息</a-divider>
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item
+                label="公益师资"
+                name="public_welfare_teacher"
+                class="form-item"
+              >
+                <a-input
+                  v-model:value="formState.public_welfare_teacher"
+                  placeholder="请输入公益师资信息"
+                  size="large"
+                  class="input-field"
+                />
+              </a-form-item>
+            </a-col>
+
+            <a-col :span="12">
+              <a-form-item
+                label="公益学生来自哪所机构申请引荐"
+                name="from_institution"
+                class="form-item"
+              >
+                <a-input
+                  v-model:value="formState.from_institution"
+                  placeholder="请输入申请引荐的机构名称"
+                  size="large"
+                  class="input-field"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+
+          <!-- 退费标准 -->
+          <a-divider orientation="left">退费标准</a-divider>
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item
+                label="使用主办方乐器课时费（元/课）"
+                name="lesson_fee_with_instrument"
+                class="form-item"
+              >
+                <a-input-number
+                  v-model:value="formState.lesson_fee_with_instrument"
+                  placeholder="请输入使用主办方乐器的课时费"
+                  size="large"
+                  class="input-field"
+                  :min="0"
+                  :precision="2"
+                  style="width: 100%"
+                />
+              </a-form-item>
+            </a-col>
+
+            <a-col :span="12">
+              <a-form-item
+                label="未使用主办方乐器课时费（元/课）"
+                name="lesson_fee_without_instrument"
+                class="form-item"
+              >
+                <a-input-number
+                  v-model:value="formState.lesson_fee_without_instrument"
+                  placeholder="请输入未使用主办方乐器的课时费"
+                  size="large"
+                  class="input-field"
+                  :min="0"
+                  :precision="2"
+                  style="width: 100%"
+                />
+              </a-form-item>
+            </a-col>
+          </a-row>
+
           <a-form-item class="form-item submit-item">
             <a-space size="large">
               <a-button
@@ -387,6 +502,12 @@ interface FormState {
   teaching_time: string
   learning_time: string
   instrument_deposit: string
+  pay_method: string
+  amount: number | null
+  public_welfare_teacher: string
+  from_institution: string
+  lesson_fee_with_instrument: number | null
+  lesson_fee_without_instrument: number | null
 }
 
 const formState = reactive<FormState>({
@@ -405,6 +526,12 @@ const formState = reactive<FormState>({
   teaching_time: '线下课',
   learning_time: '50课时(1.5年)',
   instrument_deposit: '需要押金',
+  pay_method: '微信',
+  amount: null,
+  public_welfare_teacher: '',
+  from_institution: '',
+  lesson_fee_with_instrument: null,
+  lesson_fee_without_instrument: null,
 })
 
 // 初始化地址数据和用户信息
@@ -547,6 +674,54 @@ const rules = {
   ],
   instrument_deposit: [
     { required: true, message: '请选择是否需要押金!', trigger: 'change' },
+  ],
+  pay_method: [
+    { required: true, message: '请选择支付方式!', trigger: 'change' },
+  ],
+  amount: [
+    { required: true, message: '请输入金额!', trigger: 'blur' },
+    { type: 'number', min: 0.01, message: '金额必须大于0!', trigger: 'blur' },
+    {
+      validator: (_rule: any, value: number) => {
+        if (value && (value * 100) % 1 !== 0) {
+          return Promise.reject(new Error('金额最多只能有两位小数!'))
+        }
+        return Promise.resolve()
+      },
+      trigger: 'blur'
+    },
+  ],
+  public_welfare_teacher: [
+    { required: true, message: '请输入公益师资信息!', trigger: 'blur' },
+  ],
+  from_institution: [
+    { required: true, message: '请输入申请引荐的机构名称!', trigger: 'blur' },
+  ],
+  lesson_fee_with_instrument: [
+    { required: true, message: '请输入使用主办方乐器的课时费!', trigger: 'blur' },
+    { type: 'number', min: 0.01, message: '课时费必须大于0!', trigger: 'blur' },
+    {
+      validator: (_rule: any, value: number) => {
+        if (value && (value * 100) % 1 !== 0) {
+          return Promise.reject(new Error('课时费最多只能有两位小数!'))
+        }
+        return Promise.resolve()
+      },
+      trigger: 'blur'
+    },
+  ],
+  lesson_fee_without_instrument: [
+    { required: true, message: '请输入未使用主办方乐器的课时费!', trigger: 'blur' },
+    { type: 'number', min: 0.01, message: '课时费必须大于0!', trigger: 'blur' },
+    {
+      validator: (_rule: any, value: number) => {
+        if (value && (value * 100) % 1 !== 0) {
+          return Promise.reject(new Error('课时费最多只能有两位小数!'))
+        }
+        return Promise.resolve()
+      },
+      trigger: 'blur'
+    },
   ],
 }
 

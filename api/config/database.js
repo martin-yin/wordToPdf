@@ -92,6 +92,12 @@ async function initDatabase() {
         teaching_time ENUM('线下课', '线上课') NOT NULL,
         learning_time VARCHAR(50) NOT NULL,
         instrument_deposit ENUM('需要押金', '无需押金') NOT NULL,
+        pay_method VARCHAR(50) NOT NULL,
+      amount DECIMAL(10,2) NOT NULL,
+      public_welfare_teacher VARCHAR(100) NOT NULL,
+        from_institution VARCHAR(200) NOT NULL,
+        lesson_fee_with_instrument DECIMAL(10,2) NOT NULL,
+        lesson_fee_without_instrument DECIMAL(10,2) NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

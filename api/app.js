@@ -7,6 +7,88 @@ const Docxtemplater = require('docxtemplater');
 const PizZip = require('pizzip');
 const { exec } = require('child_process');
 
+// 日志工具函数
+function log(level, message, data = null) {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+  
+  if (data) {
+    console.log(logMessage, data);
+  } else {
+    console.log(logMessage);
+  }
+}
+
+// 数字转中文大写函数
+function numberToChinese(num) {
+  if (!num || isNaN(num)) return '';
+  
+  const digits = ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖'];
+  const units = ['', '拾', '佰', '仟'];
+  const bigUnits = ['', '万', '亿'];
+  
+  // 处理小数部分
+  const parts = num.toString().split('.');
+  const integerPart = parseInt(parts[0]);
+  const decimalPart = parts[1];
+  
+  if (integerPart === 0) {
+    if (decimalPart) {
+      let result = '';
+      if (decimalPart.length >= 1) {
+        result += digits[parseInt(decimalPart[0])] + '角';
+      }
+      if (decimalPart.length >= 2) {
+        result += digits[parseInt(decimalPart[1])] + '分';
+      }
+      return result || '零元';
+    }
+    return '零元';
+  }
+  
+  let result = '';
+  let numStr = integerPart.toString();
+  let len = numStr.length;
+  
+  for (let i = 0; i < len; i++) {
+    const digit = parseInt(numStr[i]);
+    const pos = len - i - 1;
+    
+    if (digit !== 0) {
+      result += digits[digit] + units[pos % 4];
+      if (pos >= 4 && pos % 4 === 0) {
+        result += bigUnits[Math.floor(pos / 4)];
+      }
+    } else if (result && !result.endsWith('零')) {
+      result += '零';
+    }
+  }
+  
+  // 处理万和亿
+  if (len > 4) {
+    const wanPos = len - 4;
+    if (wanPos > 0 && wanPos <= 4) {
+      result = result.replace(/零+万/, '万');
+    }
+  }
+  
+  result += '元';
+  
+  // 处理小数部分
+  if (decimalPart) {
+    if (decimalPart.length >= 1 && decimalPart[0] !== '0') {
+      result += digits[parseInt(decimalPart[0])] + '角';
+    }
+    if (decimalPart.length >= 2 && decimalPart[1] !== '0') {
+      result += digits[parseInt(decimalPart[1])] + '分';
+    }
+  } else {
+    result += '整';
+  }
+  
+  return result;
+}
+
 // 加载地址数据
 const pcaData = JSON.parse(fs.readFileSync(path.join(__dirname, 'pca-code.json'), 'utf8'));
 
@@ -100,10 +182,29 @@ function generatePDF(studentData) {
         current_level: studentData.current_level || '',
         art_subject: studentData.art_subject || '',
         learning_goal: studentData.learning_goal || '',
-        teaching_method: studentData.teaching_method === '一对一' ? '☑ 一对一 □ 一对多' : '□ 一对一 ☑ 一对多',
-        teaching_time: studentData.teaching_time === '线下课' ? '☑ 线下课 □ 线上课' : '□ 线下课 ☑ 线上课',
-        learning_time: studentData.learning_time ? `☑ ${studentData.learning_time}` : '',
-        instrument_deposit: studentData.instrument_deposit === '需要押金' ? '☑ 需要押金\n□ 无需押金' : '□ 需要押金\n☑ 无需押金',
+        teaching_method: studentData.teaching_method === '一对一' ? '☑一对一 □一对多' : '□一对一 ☑一对多',
+        teaching_time: studentData.teaching_time === '线下课' ? ' ☑线下课 □线上课' : ' □线下课 ☑线上课',
+        learning_time: (() => {
+          const options = ['50课时(1.5年)', '100课时(3年)', '200课时(5年)'];
+          return options.map(option => 
+            studentData.learning_time === option ? `☑${option} ` : `□${option} `
+          ).join(' ');
+        })(),
+        instrument_deposit: studentData.instrument_deposit === '需要押金' ? ' ☑需要押金\n□无需押金' : ' □需要押金\n☑无需押金',
+        pay_method: (() => {
+          const payMethods = {
+            '微信': '☑微信 □支付宝 □银行转账',
+            '支付宝': '□微信 ☑支付宝 □银行转账',
+            '银行转账': '□微信 □支付宝 ☑银行转账'
+          };
+          return payMethods[studentData.pay_method] || '□微信 □支付宝 □银行转账';
+        })(),
+        amount: studentData.amount || '',
+        amount_in_words: studentData.amount ? numberToChinese(studentData.amount) : '',
+        public_welfare_teacher: studentData.public_welfare_teacher || '',
+        from_institution: studentData.from_institution || '',
+        lesson_fee_with_instrument: studentData.lesson_fee_with_instrument || '',
+        lesson_fee_without_instrument: studentData.lesson_fee_without_instrument || '',
       };
 
       // 渲染文档
@@ -157,6 +258,36 @@ function generatePDF(studentData) {
 const app = new Koa();
 const api = Router({ prefix: '/api' });
 
+// 日志中间件
+app.use(async (ctx, next) => {
+  const start = Date.now();
+  const { method, url, ip } = ctx.request;
+  
+  log('info', `${method} ${url} - 请求开始`, {
+    ip,
+    userAgent: ctx.request.headers['user-agent'],
+    body: method === 'POST' || method === 'PUT' ? ctx.request.body : undefined
+  });
+  
+  try {
+    await next();
+    const duration = Date.now() - start;
+    log('info', `${method} ${url} - 请求完成`, {
+      status: ctx.status,
+      duration: `${duration}ms`
+    });
+  } catch (error) {
+    const duration = Date.now() - start;
+    log('error', `${method} ${url} - 请求失败`, {
+      status: ctx.status || 500,
+      duration: `${duration}ms`,
+      error: error.message,
+      stack: error.stack
+    });
+    throw error;
+  }
+});
+
 // 解析JSON请求体
 app.use(async (ctx, next) => {
   if (ctx.request.type === 'application/json') {
@@ -202,7 +333,10 @@ router.post('/login', async (ctx, next) => {
   try {
     const { username, password } = ctx.request.body || {};
     
+    log('info', '用户尝试登录', { username, ip: ctx.request.ip });
+    
     if (!username || !password) {
+      log('warn', '登录失败：用户名或密码为空', { username, ip: ctx.request.ip });
       ctx.status = 400;
       ctx.body = { success: false, message: '用户名和密码不能为空' };
       return;
@@ -215,6 +349,12 @@ router.post('/login', async (ctx, next) => {
     
     if (users.length > 0) {
       const user = users[0];
+      log('info', '用户登录成功', { 
+        userId: user.id, 
+        username: user.username, 
+        role: user.role, 
+        ip: ctx.request.ip 
+      });
       ctx.body = {
         success: true,
         message: '登录成功',
@@ -225,11 +365,12 @@ router.post('/login', async (ctx, next) => {
         }
       };
     } else {
+      log('warn', '登录失败：用户名或密码错误', { username, ip: ctx.request.ip });
       ctx.status = 401;
       ctx.body = { success: false, message: '用户名或密码错误' };
     }
   } catch (error) {
-    console.error('登录错误:', error);
+    log('error', '登录接口异常', { username, error: error.message, stack: error.stack });
     ctx.status = 500;
     ctx.body = { success: false, message: '服务器内部错误' };
   }
@@ -268,7 +409,7 @@ router.put('/password', async (ctx, next) => {
     
     ctx.body = { success: true, message: '密码修改成功' };
   } catch (error) {
-    console.error('修改密码错误:', error);
+    log('error', '修改密码异常', { error: error.message, stack: error.stack });
     ctx.status = 500;
     ctx.body = { success: false, message: '服务器内部错误' };
   }
@@ -284,10 +425,14 @@ router.post('/student', async (ctx, next) => {
     const {
       name, age, gender, phone, location_province, location_city, location_county,
       hobby, current_level, art_subject, learning_goal, teaching_method,
-      teaching_time, learning_time, instrument_deposit
+      teaching_time, learning_time, instrument_deposit, pay_method, amount,
+      public_welfare_teacher, from_institution, lesson_fee_with_instrument, lesson_fee_without_instrument
     } = studentData;
     
-    if (!name || !gender || !phone || !current_level || !art_subject || !teaching_method || !teaching_time || !learning_time || !instrument_deposit) {
+    log('info', '开始提交学员资料', { name, phone, art_subject, ip: ctx.request.ip });
+    
+    if (!name || !gender || !phone || !current_level || !art_subject || !teaching_method || !teaching_time || !learning_time || !instrument_deposit || !pay_method || !amount || !public_welfare_teacher || !from_institution || !lesson_fee_with_instrument || !lesson_fee_without_instrument) {
+      log('warn', '学员资料提交失败：必填字段为空', { name, phone, missingFields: '必填字段检查失败' });
       ctx.status = 400;
       ctx.body = { success: false, message: '必填字段不能为空' };
       return;
@@ -297,14 +442,24 @@ router.post('/student', async (ctx, next) => {
       `INSERT INTO students (
         name, age, gender, phone, location_province, location_city, location_county,
         hobby, current_level, art_subject, learning_goal, teaching_method,
-        teaching_time, learning_time, instrument_deposit
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        teaching_time, learning_time, instrument_deposit, pay_method, amount,
+        public_welfare_teacher, from_institution, lesson_fee_with_instrument, lesson_fee_without_instrument
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name, age, gender, phone, location_province, location_city, location_county,
         hobby, current_level, art_subject, learning_goal, teaching_method,
-        teaching_time, learning_time, instrument_deposit
+        teaching_time, learning_time, instrument_deposit, pay_method, amount,
+        public_welfare_teacher, from_institution, lesson_fee_with_instrument, lesson_fee_without_instrument
       ]
     );
+    
+    log('info', '学员资料提交成功', { 
+      studentId: result.insertId, 
+      name, 
+      phone, 
+      art_subject,
+      ip: ctx.request.ip 
+    });
     
     ctx.body = {
       success: true,
@@ -312,7 +467,10 @@ router.post('/student', async (ctx, next) => {
       data: { id: result.insertId }
     };
   } catch (error) {
-    console.error('提交学员资料错误:', error);
+    log('error', '学员资料提交异常', { 
+      error: error.message, 
+      stack: error.stack 
+    });
     ctx.status = 500;
     ctx.body = { success: false, message: '服务器内部错误' };
   }
@@ -398,7 +556,7 @@ router.get('/students', async (ctx, next) => {
       }
     };
   } catch (error) {
-    console.error('获取学员列表错误:', error);
+    log('error', '获取学员列表异常', { error: error.message, stack: error.stack });
     ctx.status = 500;
     ctx.body = { success: false, message: '服务器内部错误' };
   }
@@ -410,23 +568,47 @@ router.get('/students', async (ctx, next) => {
 router.get('/student/:id/pdf', async (ctx, next) => {
   try {
     const { id } = ctx.params;
+    
+    log('info', '开始生成学员PDF', { studentId: id, ip: ctx.request.ip });
+    
     // 获取学员信息
     const students = await query('SELECT * FROM students WHERE id = ?', [id]);
     if (students.length === 0) {
+      log('warn', 'PDF生成失败：学员不存在', { studentId: id, ip: ctx.request.ip });
       ctx.status = 404;
       ctx.body = { success: false, message: '学员不存在' };
       return;
     }
     const student = students[0];
+    
+    log('info', '开始生成PDF文件', { 
+      studentId: id, 
+      studentName: student.name, 
+      ip: ctx.request.ip 
+    });
+    
     // 生成PDF
     const pdfBuffer = await generatePDF(student);
+    
+    log('info', 'PDF生成成功', { 
+      studentId: id, 
+      studentName: student.name, 
+      pdfSize: pdfBuffer.length,
+      ip: ctx.request.ip 
+    });
+    
     // 设置响应头
     ctx.set('Content-Type', 'application/pdf');
     ctx.set('Content-Disposition', `attachment; filename="${encodeURIComponent(student.name || 'student')}_profile.pdf"`);
     
     ctx.body = pdfBuffer;
   } catch (error) {
-    console.error('生成PDF错误:', error);
+    log('error', 'PDF生成异常', { 
+      studentId: ctx.params.id, 
+      error: error.message, 
+      stack: error.stack,
+      ip: ctx.request.ip 
+    });
     ctx.status = 500;
     ctx.body = { success: false, message: '生成PDF失败: ' + error.message };
   }
@@ -481,7 +663,7 @@ router.get('/manager', async (ctx, next) => {
       data: managers
     };
   } catch (error) {
-    console.error('获取管理人员列表错误:', error);
+    log('error', '获取管理人员列表异常', { error: error.message, stack: error.stack });
     ctx.status = 500;
     ctx.body = { success: false, message: '服务器内部错误' };
   }
@@ -522,7 +704,7 @@ router.put('/manager/:id', async (ctx, next) => {
       ctx.status = 400;
       ctx.body = { success: false, message: '用户名已存在' };
     } else {
-      console.error('修改管理人员错误:', error);
+      log('error', '修改管理人员异常', { error: error.message, stack: error.stack });
       ctx.status = 500;
       ctx.body = { success: false, message: '服务器内部错误' };
     }
@@ -540,7 +722,7 @@ router.delete('/manager/:id', async (ctx, next) => {
     
     ctx.body = { success: true, message: '管理人员删除成功' };
   } catch (error) {
-    console.error('删除管理人员错误:', error);
+    log('error', '删除管理人员异常', { error: error.message, stack: error.stack });
     ctx.status = 500;
     ctx.body = { success: false, message: '服务器内部错误' };
   }
@@ -555,23 +737,28 @@ app.use(api.middleware());
 // 启动服务器
 async function startServer() {
   try {
+    log('info', '开始启动服务器');
+    
     // 测试数据库连接
+    log('info', '正在测试数据库连接');
     const isConnected = await testConnection();
     if (!isConnected) {
-      console.error('数据库连接失败，服务器启动中止');
+      log('error', '数据库连接失败，服务器启动中止');
       process.exit(1);
     }
+    log('info', '数据库连接成功');
     
     // 初始化数据库
+    log('info', '正在初始化数据库');
     await initDatabase();
+    log('info', '数据库初始化完成');
     
     // 启动服务器
     app.listen(3000, () => {
-      console.log('服务器启动成功，端口: 3000');
-      console.log('API地址: http://localhost:3000/api');
+      log('info', '服务器启动成功', { port: 3000, apiUrl: 'http://localhost:3000/api' });
     });
   } catch (error) {
-    console.error('服务器启动失败:', error);
+    log('error', '服务器启动失败', { error: error.message, stack: error.stack });
     process.exit(1);
   }
 }
