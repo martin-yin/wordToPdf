@@ -113,7 +113,7 @@ const handleLogout = () => {
 }
 
 const handleUserManagement = () => {
-  message.info('机构人员管理功能开发中...')
+  router.push('/staff-management')
 }
 
 const handlePasswordChange = () => {

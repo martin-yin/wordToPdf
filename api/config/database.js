@@ -65,6 +65,7 @@ async function initDatabase() {
         username VARCHAR(50) UNIQUE NOT NULL,
         password VARCHAR(255) NOT NULL,
         role ENUM('admin', 'user') DEFAULT 'user',
+        institution_name VARCHAR(100) DEFAULT '',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -72,6 +73,16 @@ async function initDatabase() {
     
     await query(createAdminTable);
     console.log('管理员表创建成功');
+    
+    // 添加机构名称字段（如果不存在）
+    try {
+      await query('ALTER TABLE admins ADD COLUMN institution_name VARCHAR(100) DEFAULT ""');
+      console.log('机构名称字段添加成功');
+    } catch (error) {
+      if (error.code !== 'ER_DUP_FIELDNAME') {
+        console.error('添加机构名称字段失败:', error.message);
+      }
+    }
     
     // 创建学员资料表
     const createStudentTable = `

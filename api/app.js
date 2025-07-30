@@ -621,7 +621,7 @@ router.get('/student/:id/pdf', async (ctx, next) => {
 // 创建管理人员
 router.post('/manager', async (ctx, next) => {
   try {
-    const { username, password, role = 'user' } = ctx.request.body || {};
+    const { username, password, role = 'user', institution_name = '' } = ctx.request.body || {};
     
     if (!username || !password) {
       ctx.status = 400;
@@ -630,8 +630,8 @@ router.post('/manager', async (ctx, next) => {
     }
     
     const result = await query(
-      'INSERT INTO admins (username, password, role) VALUES (?, ?, ?)',
-      [username, password, role]
+      'INSERT INTO admins (username, password, role, institution_name) VALUES (?, ?, ?, ?)',
+      [username, password, role, institution_name]
     );
     
     ctx.body = {
@@ -656,7 +656,7 @@ router.post('/manager', async (ctx, next) => {
 // 获取管理人员列表
 router.get('/manager', async (ctx, next) => {
   try {
-    const managers = await query('SELECT id, username, role, created_at FROM admins ORDER BY created_at DESC');
+    const managers = await query('SELECT id, username, role, institution_name, created_at FROM admins WHERE role != "admin" ORDER BY created_at DESC');
     
     ctx.body = {
       success: true,
@@ -675,7 +675,7 @@ router.get('/manager', async (ctx, next) => {
 router.put('/manager/:id', async (ctx, next) => {
   try {
     const { id } = ctx.params;
-    const { username, password, role } = ctx.request.body || {};
+    const { username, password, role, institution_name } = ctx.request.body || {};
     
     let sql = 'UPDATE admins SET updated_at = CURRENT_TIMESTAMP';
     const params = [];
@@ -691,6 +691,10 @@ router.put('/manager/:id', async (ctx, next) => {
     if (role) {
       sql += ', role = ?';
       params.push(role);
+    }
+    if (institution_name !== undefined) {
+      sql += ', institution_name = ?';
+      params.push(institution_name);
     }
     
     sql += ' WHERE id = ?';
