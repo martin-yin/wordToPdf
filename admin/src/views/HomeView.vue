@@ -313,12 +313,12 @@ const handlePrintPdf = async (record: StudentRecord) => {
   <div class="home-container">
     <!-- 用户信息头部 -->
     <div class="user-header">
+      <!-- 用户信息头部 -->
       <div class="user-info">
-        <span
-          >欢迎，{{ userInfo?.username }} ({{
-            userInfo?.role === 'admin' ? '管理员' : '用户'
-          }})</span
-        >
+        <a-space>
+          <UserOutlined />
+          <span>{{ userInfo?.username }}（管理员）</span>
+        </a-space>
       </div>
       <div class="header-actions">
         <a-dropdown>
@@ -550,25 +550,25 @@ const handlePrintPdf = async (record: StudentRecord) => {
 <style scoped>
 .home-container {
   min-height: 100vh;
-  background: #f0f2f5;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;
 }
 
 .user-header {
-  background: white;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 12px;
   padding: 16px 24px;
-  border-radius: 8px;
-  margin-bottom: 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
 }
 
 .user-info {
-  font-size: 16px;
-  color: #333;
-  font-weight: 500;
+  color: #666;
+  font-size: 14px;
 }
 
 .header-actions {

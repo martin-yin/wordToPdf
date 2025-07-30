@@ -1,11 +1,19 @@
 <template>
   <div class="submit-container">
+    <!-- 全屏Loading -->
+    <div v-if="fullScreenLoading" class="full-screen-loading">
+      <div class="loading-content">
+        <a-spin size="large" />
+        <div class="loading-text">正在提交学员信息，请稍候...</div>
+      </div>
+    </div>
+
     <!-- 用户信息头部 -->
     <div class="user-header">
       <div class="user-info">
         <a-space>
           <UserOutlined />
-          <span>{{ userInfo?.username }}（{{ userInfo?.role === 'admin' ? '管理员' : '用户' }}）</span>
+          <span>{{ userInfo?.username }}（{{ userInfo?.role === 'admin' ? '管理员' : '机构人员' }}）</span>
         </a-space>
       </div>
       <a-button type="primary" @click="handleLogout" size="small">
@@ -441,7 +449,7 @@
                 @click="resetForm"
                 class="reset-button"
               >
-                重置表单
+                重置
               </a-button>
             </a-space>
           </a-form-item>
@@ -470,6 +478,7 @@ import pcaData from '@/assets/pca-code.json'
 const router = useRouter()
 const userInfo = ref<any>(null)
 const loading = ref(false)
+const fullScreenLoading = ref(false)
 const phoneChecking = ref(false)
 const phoneStatus = ref<'success' | 'error' | ''>('')
 
@@ -726,8 +735,8 @@ const rules = {
 }
 
 const onFinish = async (values: FormState) => {
-  loading.value = true
   try {
+    fullScreenLoading.value = true
     // 获取地址名称
     const provinceName = provinces.value.find(p => p.code === values.location_province)?.name || ''
     const cityName = cities.value.find(c => c.code === values.location_city)?.name || ''
@@ -759,7 +768,7 @@ const onFinish = async (values: FormState) => {
     console.error('提交学员信息失败:', error)
     message.error('网络错误，请检查后端服务是否启动')
   } finally {
-    loading.value = false
+    fullScreenLoading.value = false
   }
 }
 
@@ -789,7 +798,7 @@ const resetForm = (notice: boolean = true) => {
   updateCities()
   updateCounties()
   phoneStatus.value = ''
-  notice && message.info('表单已重置')
+  notice && message.info('已重置')
 }
 </script>
 
@@ -925,6 +934,36 @@ const resetForm = (notice: boolean = true) => {
   color: #1890ff;
 }
 
+/* 全屏Loading样式 */
+.full-screen-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.loading-content {
+  text-align: center;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.loading-text {
+  margin-top: 16px;
+  font-size: 16px;
+  color: #666;
+  font-weight: 500;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .submit-container {
@@ -946,6 +985,15 @@ const resetForm = (notice: boolean = true) => {
 
   .form-item {
     margin-bottom: 20px;
+  }
+
+  .loading-content {
+    padding: 30px;
+    margin: 20px;
+  }
+
+  .loading-text {
+    font-size: 14px;
   }
 }
 </style>

@@ -47,7 +47,7 @@
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'role'">
                   <a-tag :color="record.role === 'admin' ? 'red' : 'blue'">
-                    {{ record.role === 'admin' ? '管理员' : '用户' }}
+                    {{ record.role === 'admin' ? '管理员' : '机构人员' }}
                   </a-tag>
                 </template>
                 <template v-if="column.key === 'created_at'">
@@ -60,15 +60,15 @@
                       编辑
                     </a-button>
                     <a-popconfirm
-                      title="确定要删除这个用户吗？"
+                      title="确定要删除这个机构人员吗？"
                       @confirm="handleDelete(record)"
                       ok-text="确定"
                       cancel-text="取消"
                     >
-                      <a-button type="link" size="small" danger :disabled="record.username === 'admin'">
+                      <!-- <a-button type="link" size="small" danger :disabled="record.username === 'admin'">
                         <DeleteOutlined />
                         删除
-                      </a-button>
+                      </a-button> -->
                     </a-popconfirm>
                   </a-space>
                 </template>

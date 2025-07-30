@@ -72,7 +72,7 @@ router.beforeEach((to, from, next) => {
 
     // 检查角色权限
     if (to.meta.roles && !to.meta.roles.includes(user.role)) {
-      message.error('您没有权限访问该页面！')
+      // message.error('您没有权限访问该页面！')
       // 根据用户角色跳转到对应页面
       if (user.role === 'admin') {
         next('/')

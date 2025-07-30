@@ -128,11 +128,11 @@ async function initDatabase() {
     }
     
     // 插入默认用户账号
-    const checkUser = await query('SELECT * FROM admins WHERE username = ?', ['user']);
+    const checkUser = await query('SELECT * FROM admins WHERE username = ?', ['zhangsan']);
     if (checkUser.length === 0) {
       await query(
         'INSERT INTO admins (username, password, role) VALUES (?, ?, ?)',
-        ['user', '123456', 'user']
+        ['zhangsan', '123456', 'user']
       );
       console.log('默认用户账号创建成功');
     }
