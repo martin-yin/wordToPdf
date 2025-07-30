@@ -162,7 +162,7 @@ export function generatePDF(studentData) {
   return new Promise((resolve, reject) => {
     try {
       // 读取模板文件
-      const templatePath = path.join(__dirname, 'template_word.docx');
+      const templatePath = path.join(__dirname, '../template_word.docx');
       const content = fs.readFileSync(templatePath, 'binary');
 
       // 创建PizZip实例并加载文档
@@ -220,8 +220,8 @@ export function generatePDF(studentData) {
       
       // 创建临时文件
       const timestamp = Date.now();
-      const tempDocxPath = path.join(__dirname, `temp_${timestamp}.docx`);
-      const tempPdfPath = path.join(__dirname, `temp_${timestamp}.pdf`);
+      const tempDocxPath = path.join(__dirname, `../temp_${timestamp}.docx`);
+      const tempPdfPath = path.join(__dirname, `../temp_${timestamp}.pdf`);
       
       // 写入临时Word文件
       fs.writeFileSync(tempDocxPath, buf);

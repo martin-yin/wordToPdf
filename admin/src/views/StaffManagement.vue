@@ -185,11 +185,37 @@ const formData = reactive({
   institution_name: ''
 })
 
+// 用户名重复检查
+const checkUsernameExists = async (username: string): Promise<boolean> => {
+  try {
+    const response = await fetch(`http://localhost:3000/api/manager/check-username?username=${encodeURIComponent(username)}`)
+    const result = await response.json()
+    return result.exists
+  } catch (error) {
+    console.error('检查用户名失败:', error)
+    return false
+  }
+}
+
 // 表单验证规则
 const rules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 20, message: '用户名长度为3-20个字符', trigger: 'blur' }
+    { min: 3, max: 20, message: '用户名长度为3-20个字符', trigger: 'blur' },
+    {
+      validator: async (_rule: any, value: string) => {
+        if (!value) return Promise.resolve()
+        if (isEdit.value && currentRecord && value === currentRecord.username) {
+          return Promise.resolve() // 编辑时如果用户名未改变，则不检查
+        }
+        const exists = await checkUsernameExists(value)
+        if (exists) {
+          return Promise.reject('用户名已存在，请选择其他用户名')
+        }
+        return Promise.resolve()
+      },
+      trigger: 'blur'
+    }
   ],
   password: [
     {

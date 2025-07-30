@@ -419,6 +419,32 @@ router.get('/manager', async (ctx, next) => {
   return next();
 });
 
+// 检查用户名是否存在
+router.get('/manager/check-username', async (ctx, next) => {
+  try {
+    const { username } = ctx.query;
+    
+    if (!username) {
+      ctx.status = 400;
+      ctx.body = { success: false, message: '用户名参数不能为空' };
+      return;
+    }
+    
+    const existingUser = await query('SELECT id FROM admins WHERE username = ?', [username]);
+    
+    ctx.body = {
+      success: true,
+      exists: existingUser.length > 0
+    };
+  } catch (error) {
+    log('error', '检查用户名异常', { error: error.message, stack: error.stack });
+    ctx.status = 500;
+    ctx.body = { success: false, message: '服务器内部错误' };
+  }
+  
+  return next();
+});
+
 // 修改管理人员
 router.put('/manager/:id', async (ctx, next) => {
   try {
