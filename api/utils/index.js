@@ -187,20 +187,30 @@ export function generatePDF(studentData) {
         current_level: studentData.current_level || '',
         art_subject: studentData.art_subject || '',
         learning_goal: studentData.learning_goal || '',
-        teaching_method: studentData.teaching_method === '一对一' ? '☑一对一 □一对多' : '□一对一 ☑一对多',
-        teaching_time: studentData.teaching_time === '线下课' ? ' ☑线下课 □线上课' : ' □线下课 ☑线上课',
+        teaching_method: studentData.teaching_method === '一对一' ? '✔一对一 □一对多' : '□一对一 ☑一对多',
+        teaching_time: studentData.teaching_time === '线下课' ? ' ✔线下课 □线上课' : ' □线下课 ✔线上课',
         learning_time: (() => {
-          const options = ['50课时(1.5年)', '100课时(3年)', '200课时(5年)'];
-          return options.map(option => 
-            studentData.learning_time === option ? `☑${option} ` : `□${option} `
-          ).join(' ');
+          const options = {
+            '50课时(1.5年)': `50`,
+            '100课时(3年)': `100`,
+            '200课时(1.5年)': `200`,
+          }
+          return options[studentData.learning_time]
         })(),
-        instrument_deposit: studentData.instrument_deposit === '需要押金' ? ' ☑需要押金\n□无需押金' : ' □需要押金\n☑无需押金',
+        learning_year: (() => {
+          const options = {
+            '50课时(1.5年)': `1.5`,
+            '100课时(3年)': `3`,
+            '200课时(1.5年)': `5`,
+          }
+          return options[studentData.learning_time]
+        })(), 
+        instrument_deposit: studentData.instrument_deposit === '需要押金' ? ' ✔需要押金\n□无需押金' : ' □需要押金\n✔无需押金',
         pay_method: (() => {
           const payMethods = {
-            '微信': '☑微信 □支付宝 □银行转账',
-            '支付宝': '□微信 ☑支付宝 □银行转账',
-            '银行转账': '□微信 □支付宝 ☑银行转账'
+            '微信': '✔微信 □支付宝 □银行转账',
+            '支付宝': '□微信 ✔支付宝 □银行转账',
+            '银行转账': '□微信 □支付宝 ✔银行转账'
           };
           return payMethods[studentData.pay_method] || '□微信 □支付宝 □银行转账';
         })(),
@@ -220,8 +230,8 @@ export function generatePDF(studentData) {
       
       // 创建临时文件
       const timestamp = Date.now();
-      const tempDocxPath = path.join(__dirname, `../temp_${timestamp}.docx`);
-      const tempPdfPath = path.join(__dirname, `../temp_${timestamp}.pdf`);
+      const tempDocxPath = path.join(__dirname, `temp_${timestamp}.docx`);
+      const tempPdfPath = path.join(__dirname, `temp_${timestamp}.pdf`);
       
       // 写入临时Word文件
       fs.writeFileSync(tempDocxPath, buf);
